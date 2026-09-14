@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Bacará</title>
+<style>
+  :root{
+    --felt-dark:#07271d;
+    --felt:#0b3d2e;
+    --felt-light:#124f3c;
+    --rail:#4a2416;
+    --rail-dark:#33170d;
+    --gold:#c9a227;
+    --gold-bright:#e8c85a;
+    --cream:#f1e9d2;
+    --ink:#12100c;
+    --red:#a8322e;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--felt-dark);
+    color:var(--cream);
+    font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    overscroll-behavior:none;
+    user-select:none;
+  }
+  body{
+    background:
+      radial-gradient(ellipse at 50% 0%, var(--felt-light) 0%, var(--felt) 45%, var(--felt-dark) 100%);
+    min-height:100vh;
+    display:flex; flex-direction:column;
+    padding-top:var(--safe-top);
+    padding-bottom:var(--safe-bottom);
+  }
+  h1,h2,h3{ font-family:Georgia, "Times New Roman", serif; margin:0; }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; gap:10px;
+    border-bottom:1px solid rgba(201,162,39,0.35);
+    background:linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0));
+  }
+  .brand{ display:flex; align-items:baseline; gap:8px; }
+  .brand h1{ font-size:1.35rem; letter-spacing:0.5px; color:var(--gold-bright); }
+  .brand span{ font-size:0.68rem; color:var(--cream); opacity:0.6; }
+  .balance{
+    font-family:Georgia, serif;
+    background:rgba(0,0,0,0.3);
+    border:1px solid var(--gold);
+    border-radius:999px;
+    padding:6px 14px;
+    display:flex; align-items:center; gap:6px;
+    font-size:0.95rem;
+  }
+  .balance b{ color:var(--gold-bright); font-size:1.05rem; }
+  .addchips{
+    background:none; border:1px solid rgba(241,233,210,0.4); color:var(--cream);
+    border-radius:999px; width:26px; height:26px; font-size:1rem; line-height:1;
+    display:flex; align-items:center; justify-content:center; margin-left:4px;
+  }
+  .addchips:active{ background:rgba(255,255,255,0.15); }
+  .soundbtn{
+    background:none; border:1px solid rgba(241,233,210,0.4); color:var(--cream);
+    border-radius:999px; width:32px; height:32px; font-size:0.95rem; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .soundbtn:active{ background:rgba(255,255,255,0.15); }
+  .soundbtn.muted{ opacity:0.45; }
+
+  /* ---------- Tabs ---------- */
+  .tabs{ display:flex; padding:0 14px; gap:6px; margin-top:8px; }
+  .tab{
+    flex:1; text-align:center; padding:9px 0; font-size:0.85rem;
+    color:rgba(241,233,210,0.6); border-bottom:2px solid transparent;
+    font-weight:600; letter-spacing:0.3px;
+  }
+  .tab.active{ color:var(--gold-bright); border-color:var(--gold-bright); }
+
+  .screen{ display:none; flex:1; flex-direction:column; min-height:0; }
+  .screen.active{ display:flex; }
+
+  /* ---------- Bead road (history) ---------- */
+  .history-wrap{ padding:10px 14px 0; }
+  .history{
+    display:flex; gap:5px; overflow-x:auto; padding-bottom:6px;
+    scrollbar-width:none;
+  }
+  .history::-webkit-scrollbar{ display:none; }
+  .bead{
+    flex:0 0 auto; width:20px; height:20px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.62rem; font-weight:700; color:#fff;
+    border:1px solid rgba(255,255,255,0.25);
+  }
+  .bead.P{ background:#1e63b8; }
+  .bead.B{ background:#a8322e; }
+  .bead.T{ background:#1f7a3d; }
+
+  /* ---------- Table ---------- */
+  .table-area{
+    flex:1; display:flex; flex-direction:column; justify-content:space-between;
+    padding:8px 14px 6px;
+    min-height:0;
+  }
+  .hand-row{ display:flex; flex-direction:column; gap:4px; margin-bottom:6px; }
+  .hand-label{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:0.72rem; text-transform:uppercase; letter-spacing:1.2px;
+    color:rgba(241,233,210,0.55);
+  }
+  .hand-label .score{
+    font-family:Georgia, serif; font-size:1.1rem; color:var(--gold-bright);
+    letter-spacing:0; text-transform:none;
+  }
+  .cards{
+    display:flex; gap:8px; min-height:74px; align-items:center;
+  }
+  .card{
+    width:46px; height:66px; border-radius:6px;
+    background:var(--cream);
+    color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:Georgia, serif; font-weight:700; font-size:1.15rem;
+    box-shadow:0 2px 6px rgba(0,0,0,0.4);
+    border:1px solid rgba(0,0,0,0.15);
+    transform:translateY(-14px) scale(0.6);
+    opacity:0;
+    animation:deal 0.32s ease forwards;
+    position:relative;
+  }
+  .card.red{ color:var(--red); }
+  .card .pip{ font-size:0.85rem; margin-top:1px; }
+  @keyframes deal{ to{ transform:translateY(0) scale(1); opacity:1; } }
+
+  .center-msg{
+    text-align:center; padding:6px 0; min-height:1.6em;
+    font-family:Georgia, serif; font-size:1rem; color:var(--gold-bright);
+    letter-spacing:0.3px;
+  }
+
+  /* ---------- Betting spots ---------- */
+  .bets{
+    display:flex; gap:8px; margin-top:4px;
+  }
+  .spot{
+    flex:1; border:2px solid rgba(201,162,39,0.5); border-radius:12px;
+    padding:8px 4px; text-align:center; position:relative;
+    background:rgba(0,0,0,0.18);
+  }
+  .spot.selected{ border-color:var(--gold-bright); background:rgba(201,162,39,0.18); }
+  .spot .name{ font-size:0.78rem; font-weight:700; letter-spacing:0.4px; }
+  .spot .pay{ font-size:0.62rem; opacity:0.65; margin-top:1px; }
+  .spot .amt{
+    margin-top:4px; font-family:Georgia, serif; font-size:1rem; color:var(--gold-bright);
+    min-height:1.2em;
+  }
+  .spot.winner{ box-shadow:0 0 0 2px var(--gold-bright), 0 0 14px rgba(232,200,90,0.6); }
+
+  /* ---------- Chips ---------- */
+  .chip-tray{
+    display:flex; justify-content:center; gap:10px; padding:10px 14px 4px;
+    flex-wrap:wrap;
+  }
+  .chip{
+    width:48px; height:48px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:Georgia, serif; font-weight:700; font-size:0.85rem;
+    color:#fff; border:2px dashed rgba(255,255,255,0.55);
+    box-shadow:0 3px 5px rgba(0,0,0,0.4);
+    position:relative;
+  }
+  .chip.active{ outline:3px solid var(--gold-bright); outline-offset:2px; }
+  .chip[data-v="1"]{ background:#3a3a3a; }
+  .chip[data-v="5"]{ background:#a8322e; }
+  .chip[data-v="25"]{ background:#1e63b8; }
+  .chip[data-v="100"]{ background:#1f7a3d; }
+  .chip[data-v="500"]{ background:#5c2d91; }
+
+  /* ---------- Bottom controls ---------- */
+  .controls{
+    display:flex; flex-direction:column; gap:8px;
+    padding:10px 14px calc(12px + var(--safe-bottom));
+    border-top:1px solid rgba(201,162,39,0.3);
+    background:linear-gradient(0deg, rgba(0,0,0,0.3), rgba(0,0,0,0));
+  }
+  .controls-row{ display:flex; gap:10px; }
+  .btn{
+    flex:1; border:none; border-radius:10px; padding:13px 0; font-size:0.95rem;
+    font-weight:700; letter-spacing:0.3px; font-family:inherit;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn.primary{ background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:#2a2005; }
+  .btn.ghost{ background:rgba(255,255,255,0.08); color:var(--cream); border:1px solid rgba(241,233,210,0.3); }
+  .btn.small{ padding:10px 0; font-size:0.82rem; }
+  .btn:disabled{ opacity:0.4; }
+
+  /* ---------- Rules screen ---------- */
+  .rules{ padding:16px 18px calc(24px + var(--safe-bottom)); overflow-y:auto; line-height:1.5; }
+  .rules h2{ color:var(--gold-bright); font-size:1.15rem; margin-bottom:6px; }
+  .rules h3{ color:var(--cream); font-size:0.98rem; margin:18px 0 6px; border-bottom:1px solid rgba(201,162,39,0.3); padding-bottom:4px; }
+  .rules p, .rules li{ font-size:0.88rem; color:rgba(241,233,210,0.92); }
+  .rules ul{ padding-left:20px; margin:6px 0; }
+  .rules table{ width:100%; border-collapse:collapse; margin:8px 0; font-size:0.82rem; }
+  .rules th, .rules td{ border:1px solid rgba(201,162,39,0.3); padding:6px 7px; text-align:center; }
+  .rules th{ background:rgba(201,162,39,0.15); color:var(--gold-bright); }
+  .badge{
+    display:inline-block; background:rgba(201,162,39,0.2); border:1px solid var(--gold);
+    color:var(--gold-bright); border-radius:6px; padding:1px 6px; font-size:0.78rem;
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand"><h1>Bacará</h1><span>mesa privada</span></div>
+    <div class="balance">🪙 <b id="balanceVal">1000</b>
+      <button class="addchips" id="addChipsBtn" title="Añadir fichas">+</button>
+    </div>
+    <button class="soundbtn" id="soundBtn" title="Silenciar sonido">🔊</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="play">Jugar</div>
+    <div class="tab" data-tab="rules">Reglas e instrucciones</div>
+  </div>
+
+  <!-- ================= PLAY SCREEN ================= -->
+  <div class="screen active" id="screen-play">
+
+    <div class="history-wrap">
+      <div class="history" id="history"></div>
+    </div>
+
+    <div class="table-area">
+      <div>
+        <div class="hand-row">
+          <div class="hand-label"><span>Banca</span><span class="score" id="bankerScore">&nbsp;</span></div>
+          <div class="cards" id="bankerCards"></div>
+        </div>
+        <div class="hand-row">
+          <div class="hand-label"><span>Jugador</span><span class="score" id="playerScore">&nbsp;</span></div>
+          <div class="cards" id="playerCards"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="center-msg" id="centerMsg">Elige una ficha y coloca tu apuesta</div>
+
+        <div class="bets">
+          <div class="spot" id="spot-player" data-side="player">
+            <div class="name">Jugador</div>
+            <div class="pay">paga 1 a 1</div>
+            <div class="amt" id="amt-player"></div>
+          </div>
+          <div class="spot" id="spot-tie" data-side="tie">
+            <div class="name">Empate</div>
+            <div class="pay">paga 8 a 1</div>
+            <div class="amt" id="amt-tie"></div>
+          </div>
+          <div class="spot" id="spot-banker" data-side="banker">
+            <div class="name">Banca</div>
+            <div class="pay">paga 0.95 a 1</div>
+            <div class="amt" id="amt-banker"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chip-tray" id="chipTray">
+      <div class="chip active" data-v="1">1</div>
+      <div class="chip" data-v="5">5</div>
+      <div class="chip" data-v="25">25</div>
+      <div class="chip" data-v="100">100</div>
+      <div class="chip" data-v="500">500</div>
+    </div>
+
+    <div class="controls">
+      <div class="controls-row">
+        <button class="btn ghost small" id="rebetBtn" disabled>↺ Repetir apuesta</button>
+        <button class="btn ghost small" id="doubleBtn" disabled>×2 Doblar apuesta</button>
+      </div>
+      <div class="controls-row">
+        <button class="btn ghost" id="clearBtn">Borrar</button>
+        <button class="btn primary" id="dealBtn">Repartir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= RULES SCREEN ================= -->
+  <div class="screen" id="screen-rules">
+    <div class="rules">
+      <h2>Cómo se juega el Bacará</h2>
+      <p>El bacará es un juego de comparación: no compites contra la banca como en el blackjack, sino que apuestas a cuál de las dos manos —<b>Jugador</b> o <b>Banca</b>— tendrá el valor más cercano a 9, o si ambas empatarán. Las cartas se reparten siguiendo reglas fijas; nadie decide si "pedir" o "plantarse", así que solo necesitas elegir tu apuesta antes de repartir.</p>
+
+      <h3>1. Valor de las cartas</h3>
+      <ul>
+        <li>Del <b>2 al 9</b>: valen su número.</li>
+        <li><b>10, J, Q, K</b>: valen <b>0</b>.</li>
+        <li><b>As</b>: vale <b>1</b>.</li>
+      </ul>
+      <p>El valor de una mano es la suma de sus cartas, pero solo se cuenta el <b>último dígito</b>. Por ejemplo, 7 + 8 = 15 → la mano vale <b>5</b>. Por eso el máximo posible es 9 y el mínimo es 0.</p>
+
+      <h3>2. El reparto inicial</h3>
+      <p>Se reparten dos cartas a "Jugador" y dos a "Banca". Si alguna de las dos manos suma <b>8 o 9</b> con esas dos cartas, se llama <span class="badge">natural</span> y la ronda termina de inmediato: gana la mano con el valor más alto (si ambas tienen el mismo valor, es empate).</p>
+
+      <h3>3. Regla de la tercera carta — Jugador</h3>
+      <p>Si no hay natural, el Jugador se rige por una regla fija:</p>
+      <ul>
+        <li>Con <b>0 a 5</b>: pide una tercera carta.</li>
+        <li>Con <b>6 o 7</b>: se planta.</li>
+      </ul>
+
+      <h3>4. Regla de la tercera carta — Banca</h3>
+      <p>La Banca también sigue una tabla fija, que depende de su propio total y de la tercera carta que recibió el Jugador (si la recibió):</p>
+      <table>
+        <tr><th>Total Banca</th><th>Pide tercera carta si la carta del Jugador es…</th></tr>
+        <tr><td>0–2</td><td>siempre pide</td></tr>
+        <tr><td>3</td><td>cualquiera excepto 8</td></tr>
+        <tr><td>4</td><td>2, 3, 4, 5, 6, 7</td></tr>
+        <tr><td>5</td><td>4, 5, 6, 7</td></tr>
+        <tr><td>6</td><td>6, 7</td></tr>
+        <tr><td>7</td><td>se planta siempre</td></tr>
+      </table>
+      <p>Si el Jugador se plantó (con 6 o 7), la Banca pide con 0–5 y se planta con 6–7, igual que el Jugador. No necesitas memorizar esta tabla: el juego la aplica automáticamente.</p>
+
+      <h3>5. Apuestas y pagos</h3>
+      <ul>
+        <li><b>Jugador</b>: paga 1 a 1.</li>
+        <li><b>Banca</b>: paga 1 a 1, pero se cobra una comisión del 5% sobre la ganancia (por eso paga efectivamente 0.95 a 1). Esto compensa que la Banca gana con más frecuencia.</li>
+        <li><b>Empate</b>: paga 8 a 1. Si apostaste a Jugador o Banca y sale empate, no pierdes: tu apuesta queda igual para la siguiente ronda (se te devuelve).</li>
+      </ul>
+
+      <h3>6. El camino de perlas (historial)</h3>
+      <p>La fila de círculos arriba de la mesa muestra el resultado de cada ronda: <span class="badge" style="background:#1e63b8;border-color:#1e63b8;color:#fff;">J</span> Jugador, <span class="badge" style="background:#a8322e;border-color:#a8322e;color:#fff;">B</span> Banca, <span class="badge" style="background:#1f7a3d;border-color:#1f7a3d;color:#fff;">E</span> Empate. Muchos jugadores lo usan para observar rachas, aunque cada mano es independiente de la anterior: las cartas no "recuerdan" lo que pasó antes.</p>
+
+      <h3>7. Cómo jugar en esta mesa</h3>
+      <ol>
+        <li>Elige el valor de ficha que quieres usar (1, 5, 25, 100 o 500).</li>
+        <li>Toca la casilla de <b>Jugador</b>, <b>Empate</b> o <b>Banca</b> para colocar esa ficha ahí. Puedes tocar varias veces para acumular, o combinar apuestas en más de una casilla.</li>
+        <li>Toca <b>Repartir</b> para jugar la mano; las cartas y el resultado se muestran automáticamente.</li>
+        <li>Toca <b>Borrar</b> en cualquier momento antes de repartir para quitar tus apuestas.</li>
+        <li>Después de tu primera ronda, aparecen dos atajos de casino: <b>↺ Repetir apuesta</b> coloca exactamente la misma apuesta que la ronda anterior, y <b>×2 Doblar apuesta</b> coloca el doble. Ambos respetan tu saldo disponible.</li>
+        <li>El icono 🔊 junto al saldo silencia o activa los sonidos de fichas, cartas y resultados.</li>
+        <li>Tus fichas son solo para practicar y aprender: no representan dinero real, no requieren pago ni conexión a internet, y puedes tocar el botón "+" junto a tu saldo para añadir más en cualquier momento, sin límite.</li>
+      </ol>
+
+      <h3>8. Consejo para principiantes</h3>
+      <p>Estadísticamente, la apuesta a <b>Banca</b> tiene la menor ventaja de la casa (por eso lleva comisión), seguida de la apuesta a <b>Jugador</b>. La apuesta a <b>Empate</b> es la más arriesgada: paga más, pero ocurre con mucha menos frecuencia. Prueba las tres para entender cómo se siente el ritmo del juego antes de decidir una estrategia.</p>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- State ----------
+  var balance = 1000;
+  var selectedChip = 1;
+  var bets = { player:0, tie:0, banker:0 };
+  var lastBets = { player:0, tie:0, banker:0 };
+  var history = []; // 'P','B','T'
+  var shoe = [];
+  var dealing = false;
+  var muted = false;
+
+  // ---------- Sound engine (synthesized, no external files) ----------
+  var audioCtx = null;
+  function getCtx(){
+    if(!audioCtx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+    }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  function tone(freq, start, dur, type, peakVol, glideTo){
+    if(muted) return;
+    try{
+      var ctx = getCtx();
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      if(glideTo){ osc.frequency.exponentialRampToValueAtTime(glideTo, ctx.currentTime + start + dur); }
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(peakVol || 0.2, ctx.currentTime + start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur + 0.02);
+    }catch(e){ /* audio unavailable, ignore silently */ }
+  }
+  function noiseBurst(start, dur, peakVol){
+    if(muted) return;
+    try{
+      var ctx = getCtx();
+      var bufferSize = Math.floor(ctx.sampleRate * dur);
+      var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      var data = buffer.getChannelData(0);
+      for(var i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); }
+      var src = ctx.createBufferSource();
+      src.buffer = buffer;
+      var filter = ctx.createBiquadFilter();
+      filter.type = 'highpass'; filter.frequency.value = 1800;
+      var gain = ctx.createGain();
+      gain.gain.setValueAtTime(peakVol || 0.18, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+      src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+      src.start(ctx.currentTime + start);
+    }catch(e){ /* ignore */ }
+  }
+  function sfxChip(){ tone(720, 0, 0.07, 'triangle', 0.18); tone(1080, 0.02, 0.05, 'triangle', 0.1); }
+  function sfxCard(delaySec){ noiseBurst(delaySec || 0, 0.09, 0.16); }
+  function sfxDeal(){ sfxCard(0); }
+  function sfxWin(){
+    tone(523, 0, 0.14, 'sine', 0.22);
+    tone(659, 0.11, 0.14, 'sine', 0.22);
+    tone(784, 0.22, 0.22, 'sine', 0.24);
+  }
+  function sfxTie(){
+    tone(440, 0, 0.16, 'triangle', 0.2);
+    tone(440, 0.18, 0.16, 'triangle', 0.2);
+  }
+  function sfxLose(){
+    tone(300, 0, 0.18, 'sawtooth', 0.14, 160);
+  }
+  function sfxClick(){ tone(300, 0, 0.05, 'square', 0.08); }
+
+  var SUITS = [
+    {sym:'♠', red:false}, {sym:'♣', red:false}, {sym:'♥', red:true}, {sym:'♦', red:true}
+  ];
+  var RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+  // ---------- Elements ----------
+  var balanceVal = document.getElementById('balanceVal');
+  var addChipsBtn = document.getElementById('addChipsBtn');
+  var chipTray = document.getElementById('chipTray');
+  var spots = {
+    player: document.getElementById('spot-player'),
+    tie: document.getElementById('spot-tie'),
+    banker: document.getElementById('spot-banker')
+  };
+  var amtEls = {
+    player: document.getElementById('amt-player'),
+    tie: document.getElementById('amt-tie'),
+    banker: document.getElementById('amt-banker')
+  };
+  var dealBtn = document.getElementById('dealBtn');
+  var clearBtn = document.getElementById('clearBtn');
+  var rebetBtn = document.getElementById('rebetBtn');
+  var doubleBtn = document.getElementById('doubleBtn');
+  var soundBtn = document.getElementById('soundBtn');
+  var centerMsg = document.getElementById('centerMsg');
+  var bankerCardsEl = document.getElementById('bankerCards');
+  var playerCardsEl = document.getElementById('playerCards');
+  var bankerScoreEl = document.getElementById('bankerScore');
+  var playerScoreEl = document.getElementById('playerScore');
+  var historyEl = document.getElementById('history');
+
+  var tabs = document.querySelectorAll('.tab');
+  var screens = {
+    play: document.getElementById('screen-play'),
+    rules: document.getElementById('screen-rules')
+  };
+
+  // ---------- Tabs ----------
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){
+      tabs.forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      Object.keys(screens).forEach(function(k){ screens[k].classList.remove('active'); });
+      screens[t.dataset.tab].classList.add('active');
+    });
+  });
+
+  // ---------- Chip tray ----------
+  chipTray.addEventListener('click', function(e){
+    var chip = e.target.closest('.chip');
+    if(!chip) return;
+    document.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    selectedChip = parseInt(chip.dataset.v, 10);
+  });
+
+  addChipsBtn.addEventListener('click', function(){
+    sfxChip();
+    balance += 1000;
+    renderBalance();
+    flashMsg('Se añadieron 1000 fichas de práctica');
+  });
+
+  soundBtn.addEventListener('click', function(){
+    muted = !muted;
+    soundBtn.textContent = muted ? '🔇' : '🔊';
+    soundBtn.classList.toggle('muted', muted);
+    soundBtn.title = muted ? 'Activar sonido' : 'Silenciar sonido';
+    if(!muted) sfxClick();
+  });
+
+  // ---------- Betting ----------
+  Object.keys(spots).forEach(function(side){
+    spots[side].addEventListener('click', function(){
+      if(dealing) return;
+      if(selectedChip > balance){ flashMsg('No tienes suficientes fichas para esa cantidad'); return; }
+      sfxChip();
+      bets[side] += selectedChip;
+      balance -= selectedChip;
+      renderBalance();
+      renderBets();
+    });
+  });
+
+  clearBtn.addEventListener('click', function(){
+    if(dealing) return;
+    var total = bets.player + bets.tie + bets.banker;
+    if(total === 0) return;
+    sfxClick();
+    balance += total;
+    bets = { player:0, tie:0, banker:0 };
+    renderBalance();
+    renderBets();
+    clearWinnerHighlight();
+    flashMsg('Apuestas borradas');
+  });
+
+  // ---------- Rebet / Double (casino-style shortcuts) ----------
+  function betsTotal(b){ return b.player + b.tie + b.banker; }
+
+  function applyBetSet(b){
+    // returns current staged bets to balance first, then tries to place `b`
+    var refund = betsTotal(bets);
+    var need = betsTotal(b);
+    var available = balance + refund;
+    if(need > available){
+      flashMsg('No tienes fichas suficientes para esa apuesta');
+      return false;
+    }
+    balance = available - need;
+    bets = { player:b.player, tie:b.tie, banker:b.banker };
+    renderBalance();
+    renderBets();
+    return true;
+  }
+
+  rebetBtn.addEventListener('click', function(){
+    if(dealing) return;
+    if(betsTotal(lastBets) === 0) return;
+    sfxChip();
+    if(applyBetSet(lastBets)) flashMsg('Misma apuesta que la ronda anterior');
+  });
+
+  doubleBtn.addEventListener('click', function(){
+    if(dealing) return;
+    if(betsTotal(lastBets) === 0) return;
+    sfxChip();
+    var doubled = { player:lastBets.player*2, tie:lastBets.tie*2, banker:lastBets.banker*2 };
+    if(applyBetSet(doubled)) flashMsg('Apuesta anterior duplicada');
+  });
+
+  function updateShortcutButtons(){
+    var has = betsTotal(lastBets) > 0;
+    rebetBtn.disabled = !has || dealing;
+    doubleBtn.disabled = !has || dealing;
+  }
+
+  function renderBalance(){ balanceVal.textContent = balance; }
+  function renderBets(){
+    Object.keys(bets).forEach(function(side){
+      amtEls[side].textContent = bets[side] > 0 ? bets[side] : '';
+      spots[side].classList.toggle('selected', bets[side] > 0);
+    });
+  }
+  function flashMsg(msg){
+    centerMsg.textContent = msg;
+  }
+  function clearWinnerHighlight(){
+    Object.keys(spots).forEach(function(s){ spots[s].classList.remove('winner'); });
+  }
+
+  // ---------- Shoe ----------
+  function buildShoe(){
+    var shoeArr = [];
+    for(var d=0; d<8; d++){ // 8-deck shoe like a real casino
+      for(var s=0; s<SUITS.length; s++){
+        for(var r=0; r<RANKS.length; r++){
+          shoeArr.push({ rank:RANKS[r], suit:SUITS[s] });
+        }
+      }
+    }
+    // Fisher-Yates shuffle
+    for(var i=shoeArr.length-1; i>0; i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var tmp = shoeArr[i]; shoeArr[i]=shoeArr[j]; shoeArr[j]=tmp;
+    }
+    return shoeArr;
+  }
+  function drawCard(){
+    if(shoe.length < 12) shoe = buildShoe();
+    return shoe.pop();
+  }
+  function cardValue(card){
+    if(card.rank === 'A') return 1;
+    if(['10','J','Q','K'].indexOf(card.rank) !== -1) return 0;
+    return parseInt(card.rank, 10);
+  }
+  function handTotal(cards){
+    var sum = 0;
+    cards.forEach(function(c){ sum += cardValue(c); });
+    return sum % 10;
+  }
+
+  // ---------- Rendering cards ----------
+  function renderCard(container, card, delay){
+    var el = document.createElement('div');
+    el.className = 'card' + (card.suit.red ? ' red' : '');
+    el.style.animationDelay = delay + 'ms';
+    el.innerHTML = '<div>'+card.rank+'</div><div class="pip">'+card.suit.sym+'</div>';
+    container.appendChild(el);
+  }
+
+  // ---------- Baccarat drawing logic ----------
+  function playerDraws(playerTotal){
+    return playerTotal <= 5;
+  }
+  function bankerDraws(bankerTotal, playerThirdCard, playerStood){
+    if(playerStood){
+      // player stood on 6 or 7 -> banker draws 0-5, stands 6-7
+      return bankerTotal <= 5;
+    }
+    var p3 = playerThirdCard === null ? null : cardValue(playerThirdCard);
+    if(bankerTotal <= 2) return true;
+    if(bankerTotal === 3) return p3 !== 8;
+    if(bankerTotal === 4) return p3 >= 2 && p3 <= 7;
+    if(bankerTotal === 5) return p3 >= 4 && p3 <= 7;
+    if(bankerTotal === 6) return p3 === 6 || p3 === 7;
+    return false; // 7 -> stand
+  }
+
+  // ---------- Deal ----------
+  dealBtn.addEventListener('click', function(){
+    if(dealing) return;
+    var totalBet = bets.player + bets.tie + bets.banker;
+    if(totalBet <= 0){ flashMsg('Coloca una apuesta antes de repartir'); return; }
+
+    dealing = true;
+    dealBtn.disabled = true;
+    clearBtn.disabled = true;
+    rebetBtn.disabled = true;
+    doubleBtn.disabled = true;
+    clearWinnerHighlight();
+    bankerCardsEl.innerHTML = '';
+    playerCardsEl.innerHTML = '';
+    bankerScoreEl.textContent = '\u00A0';
+    playerScoreEl.textContent = '\u00A0';
+    centerMsg.textContent = 'Repartiendo…';
+
+    var player = [drawCard(), drawCard()];
+    var banker = [drawCard(), drawCard()];
+
+    renderCard(playerCardsEl, player[0], 0);
+    renderCard(bankerCardsEl, banker[0], 90);
+    renderCard(playerCardsEl, player[1], 180);
+    renderCard(bankerCardsEl, banker[1], 270);
+    sfxCard(0); sfxCard(0.09); sfxCard(0.18); sfxCard(0.27);
+
+    setTimeout(function(){
+      var pTotal = handTotal(player);
+      var bTotal = handTotal(banker);
+      playerScoreEl.textContent = pTotal;
+      bankerScoreEl.textContent = bTotal;
+
+      var natural = (pTotal >= 8 || bTotal >= 8);
+      var playerThird = null;
+      var playerStood = false;
+      var delay = 420;
+
+      function afterDraws(){
+        var pFinal = handTotal(player);
+        var bFinal = handTotal(banker);
+        playerScoreEl.textContent = pFinal;
+        bankerScoreEl.textContent = bFinal;
+        setTimeout(function(){ resolveRound(pFinal, bFinal); }, 350);
+      }
+
+      if(natural){
+        afterDraws();
+        return;
+      }
+
+      if(playerDraws(pTotal)){
+        playerThird = drawCard();
+        player.push(playerThird);
+        renderCard(playerCardsEl, playerThird, 0);
+        sfxCard(0);
+        delay = 420;
+      } else {
+        playerStood = true;
+      }
+
+      setTimeout(function(){
+        if(bankerDraws(bTotal, playerThird, playerStood)){
+          var bankerThird = drawCard();
+          banker.push(bankerThird);
+          renderCard(bankerCardsEl, bankerThird, 0);
+          sfxCard(0);
+        }
+        afterDraws();
+      }, playerThird ? 420 : 60);
+
+    }, 520);
+  });
+
+  function resolveRound(pTotal, bTotal){
+    var outcome; // 'P','B','T'
+    if(pTotal > bTotal) outcome = 'P';
+    else if(bTotal > pTotal) outcome = 'B';
+    else outcome = 'T';
+
+    var winnings = 0;
+    var msgParts = [];
+
+    var playerWon = false;
+
+    if(outcome === 'P'){
+      spots.player.classList.add('winner');
+      if(bets.player > 0){ winnings += bets.player * 2; msgParts.push('¡Gana Jugador!'); playerWon = true; }
+      else msgParts.push('Gana Jugador');
+    } else if(outcome === 'B'){
+      spots.banker.classList.add('winner');
+      if(bets.banker > 0){ winnings += bets.banker + Math.floor(bets.banker * 0.95); msgParts.push('¡Gana Banca!'); playerWon = true; }
+      else msgParts.push('Gana Banca');
+    } else {
+      spots.tie.classList.add('winner');
+      if(bets.tie > 0){ winnings += bets.tie * 9; msgParts.push('¡Empate! Paga 8 a 1'); playerWon = true; }
+      else msgParts.push('Empate — apuestas a Jugador/Banca devueltas');
+      // ties push player/banker bets back
+      if(bets.player > 0) winnings += bets.player;
+      if(bets.banker > 0) winnings += bets.banker;
+    }
+
+    balance += winnings;
+    renderBalance();
+
+    history.push(outcome);
+    renderHistory();
+
+    centerMsg.textContent = msgParts.join(' · ');
+
+    if(outcome === 'T' && bets.player === 0 && bets.banker === 0 && bets.tie === 0){
+      sfxTie();
+    } else if(outcome === 'T'){
+      sfxTie();
+    } else if(playerWon){
+      sfxWin();
+    } else {
+      sfxLose();
+    }
+
+    lastBets = { player:bets.player, tie:bets.tie, banker:bets.banker };
+    bets = { player:0, tie:0, banker:0 };
+    renderBets();
+    updateShortcutButtons();
+
+    dealing = false;
+    dealBtn.disabled = false;
+    clearBtn.disabled = false;
+  }
+
+  function renderHistory(){
+    historyEl.innerHTML = '';
+    history.slice(-40).forEach(function(h){
+      var b = document.createElement('div');
+      b.className = 'bead ' + h;
+      b.textContent = h;
+      historyEl.appendChild(b);
+    });
+    historyEl.scrollLeft = historyEl.scrollWidth;
+  }
+
+  // ---------- Init ----------
+  shoe = buildShoe();
+  renderBalance();
+  renderBets();
+})();
+</script>
+</body>
+</html>
