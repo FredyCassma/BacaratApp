@@ -66,6 +66,13 @@
     display:flex; align-items:center; justify-content:center; margin-left:4px;
   }
   .addchips:active{ background:rgba(255,255,255,0.15); }
+  .soundbtn{
+    background:none; border:1px solid rgba(241,233,210,0.4); color:var(--cream);
+    border-radius:999px; width:32px; height:32px; font-size:0.95rem; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .soundbtn:active{ background:rgba(255,255,255,0.15); }
+  .soundbtn.muted{ opacity:0.45; }
 
   /* ---------- Tabs ---------- */
   .tabs{ display:flex; padding:0 14px; gap:6px; margin-top:8px; }
@@ -178,10 +185,12 @@
 
   /* ---------- Bottom controls ---------- */
   .controls{
-    display:flex; gap:10px; padding:10px 14px calc(12px + var(--safe-bottom));
+    display:flex; flex-direction:column; gap:8px;
+    padding:10px 14px calc(12px + var(--safe-bottom));
     border-top:1px solid rgba(201,162,39,0.3);
     background:linear-gradient(0deg, rgba(0,0,0,0.3), rgba(0,0,0,0));
   }
+  .controls-row{ display:flex; gap:10px; }
   .btn{
     flex:1; border:none; border-radius:10px; padding:13px 0; font-size:0.95rem;
     font-weight:700; letter-spacing:0.3px; font-family:inherit;
@@ -189,6 +198,7 @@
   .btn:active{ transform:translateY(1px); }
   .btn.primary{ background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:#2a2005; }
   .btn.ghost{ background:rgba(255,255,255,0.08); color:var(--cream); border:1px solid rgba(241,233,210,0.3); }
+  .btn.small{ padding:10px 0; font-size:0.82rem; }
   .btn:disabled{ opacity:0.4; }
 
   /* ---------- Rules screen ---------- */
@@ -213,6 +223,7 @@
     <div class="balance">🪙 <b id="balanceVal">1000</b>
       <button class="addchips" id="addChipsBtn" title="Añadir fichas">+</button>
     </div>
+    <button class="soundbtn" id="soundBtn" title="Silenciar sonido">🔊</button>
   </div>
 
   <div class="tabs">
@@ -271,8 +282,14 @@
     </div>
 
     <div class="controls">
-      <button class="btn ghost" id="clearBtn">Borrar</button>
-      <button class="btn primary" id="dealBtn">Repartir</button>
+      <div class="controls-row">
+        <button class="btn ghost small" id="rebetBtn" disabled>↺ Repetir apuesta</button>
+        <button class="btn ghost small" id="doubleBtn" disabled>×2 Doblar apuesta</button>
+      </div>
+      <div class="controls-row">
+        <button class="btn ghost" id="clearBtn">Borrar</button>
+        <button class="btn primary" id="dealBtn">Repartir</button>
+      </div>
     </div>
   </div>
 
@@ -329,6 +346,8 @@
         <li>Toca la casilla de <b>Jugador</b>, <b>Empate</b> o <b>Banca</b> para colocar esa ficha ahí. Puedes tocar varias veces para acumular, o combinar apuestas en más de una casilla.</li>
         <li>Toca <b>Repartir</b> para jugar la mano; las cartas y el resultado se muestran automáticamente.</li>
         <li>Toca <b>Borrar</b> en cualquier momento antes de repartir para quitar tus apuestas.</li>
+        <li>Después de tu primera ronda, aparecen dos atajos de casino: <b>↺ Repetir apuesta</b> coloca exactamente la misma apuesta que la ronda anterior, y <b>×2 Doblar apuesta</b> coloca el doble. Ambos respetan tu saldo disponible.</li>
+        <li>El icono 🔊 junto al saldo silencia o activa los sonidos de fichas, cartas y resultados.</li>
         <li>Tus fichas son solo para practicar y aprender: no representan dinero real, no requieren pago ni conexión a internet, y puedes tocar el botón "+" junto a tu saldo para añadir más en cualquier momento, sin límite.</li>
       </ol>
 
@@ -345,9 +364,74 @@
   var balance = 1000;
   var selectedChip = 1;
   var bets = { player:0, tie:0, banker:0 };
+  var lastBets = { player:0, tie:0, banker:0 };
   var history = []; // 'P','B','T'
   var shoe = [];
   var dealing = false;
+  var muted = false;
+
+  // ---------- Sound engine (synthesized, no external files) ----------
+  var audioCtx = null;
+  function getCtx(){
+    if(!audioCtx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+    }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  function tone(freq, start, dur, type, peakVol, glideTo){
+    if(muted) return;
+    try{
+      var ctx = getCtx();
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+      if(glideTo){ osc.frequency.exponentialRampToValueAtTime(glideTo, ctx.currentTime + start + dur); }
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(peakVol || 0.2, ctx.currentTime + start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur + 0.02);
+    }catch(e){ /* audio unavailable, ignore silently */ }
+  }
+  function noiseBurst(start, dur, peakVol){
+    if(muted) return;
+    try{
+      var ctx = getCtx();
+      var bufferSize = Math.floor(ctx.sampleRate * dur);
+      var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      var data = buffer.getChannelData(0);
+      for(var i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); }
+      var src = ctx.createBufferSource();
+      src.buffer = buffer;
+      var filter = ctx.createBiquadFilter();
+      filter.type = 'highpass'; filter.frequency.value = 1800;
+      var gain = ctx.createGain();
+      gain.gain.setValueAtTime(peakVol || 0.18, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+      src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+      src.start(ctx.currentTime + start);
+    }catch(e){ /* ignore */ }
+  }
+  function sfxChip(){ tone(720, 0, 0.07, 'triangle', 0.18); tone(1080, 0.02, 0.05, 'triangle', 0.1); }
+  function sfxCard(delaySec){ noiseBurst(delaySec || 0, 0.09, 0.16); }
+  function sfxDeal(){ sfxCard(0); }
+  function sfxWin(){
+    tone(523, 0, 0.14, 'sine', 0.22);
+    tone(659, 0.11, 0.14, 'sine', 0.22);
+    tone(784, 0.22, 0.22, 'sine', 0.24);
+  }
+  function sfxTie(){
+    tone(440, 0, 0.16, 'triangle', 0.2);
+    tone(440, 0.18, 0.16, 'triangle', 0.2);
+  }
+  function sfxLose(){
+    tone(300, 0, 0.18, 'sawtooth', 0.14, 160);
+  }
+  function sfxClick(){ tone(300, 0, 0.05, 'square', 0.08); }
 
   var SUITS = [
     {sym:'♠', red:false}, {sym:'♣', red:false}, {sym:'♥', red:true}, {sym:'♦', red:true}
@@ -370,6 +454,9 @@
   };
   var dealBtn = document.getElementById('dealBtn');
   var clearBtn = document.getElementById('clearBtn');
+  var rebetBtn = document.getElementById('rebetBtn');
+  var doubleBtn = document.getElementById('doubleBtn');
+  var soundBtn = document.getElementById('soundBtn');
   var centerMsg = document.getElementById('centerMsg');
   var bankerCardsEl = document.getElementById('bankerCards');
   var playerCardsEl = document.getElementById('playerCards');
@@ -403,9 +490,18 @@
   });
 
   addChipsBtn.addEventListener('click', function(){
+    sfxChip();
     balance += 1000;
     renderBalance();
     flashMsg('Se añadieron 1000 fichas de práctica');
+  });
+
+  soundBtn.addEventListener('click', function(){
+    muted = !muted;
+    soundBtn.textContent = muted ? '🔇' : '🔊';
+    soundBtn.classList.toggle('muted', muted);
+    soundBtn.title = muted ? 'Activar sonido' : 'Silenciar sonido';
+    if(!muted) sfxClick();
   });
 
   // ---------- Betting ----------
@@ -413,6 +509,7 @@
     spots[side].addEventListener('click', function(){
       if(dealing) return;
       if(selectedChip > balance){ flashMsg('No tienes suficientes fichas para esa cantidad'); return; }
+      sfxChip();
       bets[side] += selectedChip;
       balance -= selectedChip;
       renderBalance();
@@ -423,6 +520,8 @@
   clearBtn.addEventListener('click', function(){
     if(dealing) return;
     var total = bets.player + bets.tie + bets.banker;
+    if(total === 0) return;
+    sfxClick();
     balance += total;
     bets = { player:0, tie:0, banker:0 };
     renderBalance();
@@ -430,6 +529,46 @@
     clearWinnerHighlight();
     flashMsg('Apuestas borradas');
   });
+
+  // ---------- Rebet / Double (casino-style shortcuts) ----------
+  function betsTotal(b){ return b.player + b.tie + b.banker; }
+
+  function applyBetSet(b){
+    // returns current staged bets to balance first, then tries to place `b`
+    var refund = betsTotal(bets);
+    var need = betsTotal(b);
+    var available = balance + refund;
+    if(need > available){
+      flashMsg('No tienes fichas suficientes para esa apuesta');
+      return false;
+    }
+    balance = available - need;
+    bets = { player:b.player, tie:b.tie, banker:b.banker };
+    renderBalance();
+    renderBets();
+    return true;
+  }
+
+  rebetBtn.addEventListener('click', function(){
+    if(dealing) return;
+    if(betsTotal(lastBets) === 0) return;
+    sfxChip();
+    if(applyBetSet(lastBets)) flashMsg('Misma apuesta que la ronda anterior');
+  });
+
+  doubleBtn.addEventListener('click', function(){
+    if(dealing) return;
+    if(betsTotal(lastBets) === 0) return;
+    sfxChip();
+    var doubled = { player:lastBets.player*2, tie:lastBets.tie*2, banker:lastBets.banker*2 };
+    if(applyBetSet(doubled)) flashMsg('Apuesta anterior duplicada');
+  });
+
+  function updateShortcutButtons(){
+    var has = betsTotal(lastBets) > 0;
+    rebetBtn.disabled = !has || dealing;
+    doubleBtn.disabled = !has || dealing;
+  }
 
   function renderBalance(){ balanceVal.textContent = balance; }
   function renderBets(){
@@ -513,6 +652,8 @@
     dealing = true;
     dealBtn.disabled = true;
     clearBtn.disabled = true;
+    rebetBtn.disabled = true;
+    doubleBtn.disabled = true;
     clearWinnerHighlight();
     bankerCardsEl.innerHTML = '';
     playerCardsEl.innerHTML = '';
@@ -527,6 +668,7 @@
     renderCard(bankerCardsEl, banker[0], 90);
     renderCard(playerCardsEl, player[1], 180);
     renderCard(bankerCardsEl, banker[1], 270);
+    sfxCard(0); sfxCard(0.09); sfxCard(0.18); sfxCard(0.27);
 
     setTimeout(function(){
       var pTotal = handTotal(player);
@@ -556,6 +698,7 @@
         playerThird = drawCard();
         player.push(playerThird);
         renderCard(playerCardsEl, playerThird, 0);
+        sfxCard(0);
         delay = 420;
       } else {
         playerStood = true;
@@ -566,6 +709,7 @@
           var bankerThird = drawCard();
           banker.push(bankerThird);
           renderCard(bankerCardsEl, bankerThird, 0);
+          sfxCard(0);
         }
         afterDraws();
       }, playerThird ? 420 : 60);
@@ -582,19 +726,19 @@
     var winnings = 0;
     var msgParts = [];
 
+    var playerWon = false;
+
     if(outcome === 'P'){
       spots.player.classList.add('winner');
-      if(bets.player > 0){ winnings += bets.player * 2; msgParts.push('¡Gana Jugador!'); }
+      if(bets.player > 0){ winnings += bets.player * 2; msgParts.push('¡Gana Jugador!'); playerWon = true; }
       else msgParts.push('Gana Jugador');
-      if(bets.tie > 0) {} // lost
-      if(bets.banker > 0) {} // lost
     } else if(outcome === 'B'){
       spots.banker.classList.add('winner');
-      if(bets.banker > 0){ winnings += bets.banker + Math.floor(bets.banker * 0.95); msgParts.push('¡Gana Banca!'); }
+      if(bets.banker > 0){ winnings += bets.banker + Math.floor(bets.banker * 0.95); msgParts.push('¡Gana Banca!'); playerWon = true; }
       else msgParts.push('Gana Banca');
     } else {
       spots.tie.classList.add('winner');
-      if(bets.tie > 0){ winnings += bets.tie * 9; msgParts.push('¡Empate! Paga 8 a 1'); }
+      if(bets.tie > 0){ winnings += bets.tie * 9; msgParts.push('¡Empate! Paga 8 a 1'); playerWon = true; }
       else msgParts.push('Empate — apuestas a Jugador/Banca devueltas');
       // ties push player/banker bets back
       if(bets.player > 0) winnings += bets.player;
@@ -609,8 +753,20 @@
 
     centerMsg.textContent = msgParts.join(' · ');
 
+    if(outcome === 'T' && bets.player === 0 && bets.banker === 0 && bets.tie === 0){
+      sfxTie();
+    } else if(outcome === 'T'){
+      sfxTie();
+    } else if(playerWon){
+      sfxWin();
+    } else {
+      sfxLose();
+    }
+
+    lastBets = { player:bets.player, tie:bets.tie, banker:bets.banker };
     bets = { player:0, tie:0, banker:0 };
     renderBets();
+    updateShortcutButtons();
 
     dealing = false;
     dealBtn.disabled = false;
